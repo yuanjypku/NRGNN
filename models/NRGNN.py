@@ -281,9 +281,9 @@ class EstimateAdj(nn.Module):
         output = torch.sum(torch.mul(x0,x1),dim=1)
 
         estimated_weights = F.relu(output)
-        estimated_weights[estimated_weights < self.args.t_small] = 0.0
+        new_estimated_weights = estimated_weights * (estimated_weights < self.args.t_small)
 
-        return estimated_weights
+        return new_estimated_weights
     
     def reconstruct_loss(self, edge_index, representations):
         
