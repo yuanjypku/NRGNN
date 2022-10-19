@@ -6,6 +6,8 @@ import torch
 from models.GCN import GCN
 from models.NRGNN import NRGNN
 from dataset import Dataset
+import torch_geometric
+from utils import load_torch_geometric_data, noisify_with_P
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -24,7 +26,7 @@ parser.add_argument('--edge_hidden', type=int, default=64,
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='Dropout rate (1 - keep probability).')
 parser.add_argument('--dataset', type=str, default="cora", 
-                    choices=['cora', 'citeseer','pubmed','dblp'], help='dataset')
+                    choices=['cora', 'citeseer','pubmed','dblp', 'CS', 'Computers', 'Photo'], help='dataset')
 parser.add_argument('--ptb_rate', type=float, default=0.2, 
                     help="noise ptb_rate")
 parser.add_argument('--epochs', type=int,  default=500, 
@@ -58,12 +60,10 @@ if args.cuda:
 print(args)
 np.random.seed(15) # Here the random seed is to split the train/val/test data
 
-#%%
-if args.dataset=='dblp':
-    from torch_geometric.datasets import CitationFull
-    import torch_geometric.utils as utils
-    dataset = CitationFull('./data','dblp')
-    adj = utils.to_scipy_sparse_matrix(dataset.data.edge_index)
+#%% load Dataset
+if args.dataset in ['Computers', 'Photos', 'CS' ,'dblp']:
+    dataset = load_torch_geometric_data('./data',args.dataset)
+    adj = torch_geometric.utils.to_scipy_sparse_matrix(dataset.data.edge_index)
     features = dataset.data.x.numpy()
     labels = dataset.data.y.numpy()
     idx = np.arange(len(labels))
@@ -75,10 +75,9 @@ else:
     data = Dataset(root='./data', name=args.dataset)
     adj, features, labels = data.adj, data.features, data.labels
     idx_train, idx_val, idx_test = data.idx_train, data.idx_val, data.idx_test
-    idx_train = idx_train[:int(args.label_rate * adj.shape[0])]
+    idx_train = idx_train[:int(args.label_rate * adj.shape[0])] # 只取label_rate = 5%的标注数据训练
 
 #%% add noise to the labels
-from utils import noisify_with_P
 ptb = args.ptb_rate
 nclass = labels.max() + 1
 train_labels = labels[idx_train]

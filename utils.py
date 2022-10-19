@@ -2,6 +2,17 @@
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 import torch
+from torch_geometric.datasets import Coauthor, Amazon, CitationFull
+
+def load_torch_geometric_data(path, name):
+    name2loader ={
+        'Computers': 'Amazon',
+        'Photos': 'Amazon',
+        'dblp': 'CitationFull',
+        'CS': 'Coauthor',
+    }
+    return eval(name2loader[name])(path, name)
+
 def build_uniform_P(size, noise):
     """ The noise matrix flips any class to any other with probability
     noise / (#class - 1).

@@ -1,5 +1,6 @@
 ptb_rate=0.2
-for seed in {10..15};
+range="11 12 13 14 15"
+for seed in $range;
 do
     python train_NRGNN.py \
         --dataset cora \
