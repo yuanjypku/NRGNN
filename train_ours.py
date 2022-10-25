@@ -3,13 +3,14 @@ import time
 import argparse
 import numpy as np
 import torch
-from models.GCN import GCN
-from models.NRGNN import NRGNN
+from models.GCN import GCN, GCNConv
+from models.GCA import Encoder, GRACE, LogReg
 from dataset import Dataset
 import torch_geometric
 from utils import load_torch_geometric_data, noisify_with_P
+from models.utils import get_base_model, get_activation
 
-# Training settings
+# TODO: remove useless parsers and add useful
 parser = argparse.ArgumentParser()
 parser.add_argument('--debug', action='store_true',
                     default=False, help='debug mode')
@@ -19,17 +20,18 @@ parser.add_argument('--seed', type=int, default=13, help='Random seed.')
 
 parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=16,
+parser.add_argument('--num_hidden', type=int, default=256,
                     help='Number of hidden units.')
-parser.add_argument('--edge_hidden', type=int, default=64,
-                    help='Number of hidden units of MLP graph constructor')
-parser.add_argument('--dropout', type=float, default=0.5,
-                    help='Dropout rate (1 - keep probability).')
+parser.add_argument('--num_proj_hidden', type=int, default=32,
+                    help='Number of hidden units of projection layer')
+parser.add_argument('--num_layers', type=int, default=2,
+                    help='Number of layers of encoder')
+parser.add_argument('--tau', type=float, default=0.4)
 parser.add_argument('--dataset', type=str, default="cora", 
                     choices=['cora', 'citeseer','pubmed','dblp', 'CS', 'Computers', 'Photo'], help='dataset')
 parser.add_argument('--ptb_rate', type=float, default=0.2, 
                     help="noise ptb_rate")
-parser.add_argument('--epochs', type=int,  default=500, 
+parser.add_argument('--epochs', type=int,  default=200, 
                     help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.001, 
                     help='Initial learning rate.')
@@ -49,7 +51,11 @@ parser.add_argument("--label_rate", type=float, default=0.05,
                     help='rate of labeled data')
 parser.add_argument('--noise', type=str, default='pair', choices=['uniform', 'pair'], 
                     help='type of noises')
-
+parser.add_argument('--omega', type=float, default=0.8,
+                    help='threshold of similar neighbors')
+parser.add_argument('--gamma', type=float, default=0.8,
+                    help='threshold of embedding similarity, set > 1 for not using')
+                    
 args = parser.parse_known_args()[0]
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
@@ -95,10 +101,13 @@ np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
 
-esgnn = NRGNN(args,device)
-esgnn.fit(features, adj, noise_labels, idx_train, idx_val)
+encoder = Encoder(dataset.num_features, args.num_hidden, get_activation('prelu'), get_base_model('GCNConv'),args.num_layers)
+classifier = LogReg(args.num_hidden, labels.max() + 1)
+model = GRACE(args, device, encoder,classifier, args.num_hidden, args.num_proj_hidden, args.tau )
+# ( param['tau']).to(device)
+model.fit(features, adj, noise_labels, idx_train, idx_val)
 
-print("=====test set accuracy=======")
-esgnn.test(idx_test)
-print("===================================")
+model.logger.log("=====test set accuracy=======", _print=True)
+model.test(idx_test)
+model.logger.log("===================================", _print=True)
 # %%

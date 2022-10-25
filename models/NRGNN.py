@@ -10,6 +10,7 @@ import warnings
 import torch_geometric.utils as utils
 import scipy.sparse as sp
 from models.GCN import GCN
+from tqdm import tqdm
 from utils import accuracy,sparse_mx_to_torch_sparse_tensor
 
 class NRGNN:
@@ -47,12 +48,13 @@ class NRGNN:
         self.labels = labels
         self.idx_unlabel = torch.LongTensor(list(set(range(features.shape[0])) - set(idx_train))).to(self.device)
 
+        # Pseudo Label predictor
         self.predictor = GCN(nfeat=features.shape[1],
                          nhid=self.args.hidden,
                          nclass=labels.max().item() + 1,
                          self_loop=True,
                          dropout=self.args.dropout, device=self.device).to(self.device)
-
+        # classifier
         self.model = GCN(nfeat=features.shape[1],
                          nhid=self.args.hidden,
                          nclass=labels.max().item() + 1,
@@ -69,7 +71,7 @@ class NRGNN:
 
         # Train model
         t_total = time.time()
-        for epoch in range(args.epochs):
+        for epoch in tqdm(range(args.epochs)): 
             self.train(epoch, features, edge_index, idx_train, idx_val)
 
         print("Optimization Finished!")

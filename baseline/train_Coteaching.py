@@ -1,4 +1,6 @@
 #%%
+import sys
+sys.path.append('./')
 import time
 import argparse
 import numpy as np
@@ -6,6 +8,8 @@ import torch
 from models.Coteaching import Coteaching
 from deeprobust.graph.data import Dataset, PrePtbDataset
 from deeprobust.graph.utils import preprocess
+import torch_geometric
+from utils import load_torch_geometric_data, noisify_with_P
 import warnings
 warnings.filterwarnings("ignore")
 # Training settings
@@ -25,7 +29,7 @@ parser.add_argument('--hidden', type=int, default=16,
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='Dropout rate (1 - keep probability).')
 parser.add_argument('--dataset', type=str, default='cora',
-        choices=['cora', 'cora_ml', 'citeseer', 'polblogs', 'pubmed','dblp'], help='dataset')
+                    choices=['cora', 'citeseer','pubmed','dblp', 'CS', 'Computers', 'Photo'], help='dataset')
 parser.add_argument('--epochs', type=int,  default=400, help='Number of epochs to train.')
 parser.add_argument("--label_rate", type=float, default=0.075, help='rate of labeled data')
 parser.add_argument('--ptb_rate', type=float, default=0.2, help="noise ptb_rate")
@@ -41,11 +45,9 @@ print(args)
 
 np.random.seed(15) # Here the random seed is to split the train/val/test data, we need to set the random seed to be the same as that when you generate the perturbed graph
 
-if args.dataset=='dblp':
-    from torch_geometric.datasets import CitationFull
-    import torch_geometric.utils as utils
-    dataset = CitationFull('./data','dblp')
-    adj = utils.to_scipy_sparse_matrix(dataset.data.edge_index)
+if args.dataset in ['Computers', 'Photo', 'CS' ,'dblp']:
+    dataset = load_torch_geometric_data('./data',args.dataset)
+    adj = torch_geometric.utils.to_scipy_sparse_matrix(dataset.data.edge_index)
     features = dataset.data.x.numpy()
     labels = dataset.data.y.numpy()
     idx = np.arange(len(labels))
@@ -59,13 +61,15 @@ else:
     idx_train, idx_val, idx_test = data.idx_train, data.idx_val, data.idx_test
     idx_train = idx_train[:int(args.label_rate * adj.shape[0])]
 #%%
-from utils import noisify_with_P
 ptb = args.ptb_rate
 nclass = labels.max() + 1
 train_labels = labels[idx_train]
 noise_y, P = noisify_with_P(train_labels,nclass, ptb,10, args.noise)
 noise_labels = labels.copy()
 noise_labels[idx_train] = noise_y
+val_labels = labels[idx_val]
+noise_y, P = noisify_with_P(val_labels,nclass, ptb, 10, args.noise) 
+noise_labels[idx_val] = noise_y
 
 noise_val_y,_ = noisify_with_P(labels[idx_val],nclass, ptb,10)
 # noise_labels[idx_val] = noise_val_y

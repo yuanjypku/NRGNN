@@ -1,4 +1,6 @@
 #%%
+import sys
+sys.path.append('./')
 import time
 import argparse
 import numpy as np
@@ -6,6 +8,8 @@ import torch
 from models.GCN import GCN
 from deeprobust.graph.data import Dataset, PrePtbDataset
 from deeprobust.graph.utils import preprocess
+import torch_geometric
+from utils import load_torch_geometric_data, noisify_with_P
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -23,7 +27,7 @@ parser.add_argument('--hidden', type=int, default=16,
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='Dropout rate (1 - keep probability).')
 parser.add_argument('--dataset', type=str, default='cora',
-        choices=['cora', 'cora_ml', 'citeseer', 'polblogs', 'pubmed','dblp'], help='dataset')
+                    choices=['cora', 'citeseer','pubmed','dblp', 'CS', 'Computers', 'Photo'], help='dataset')
 parser.add_argument('--epochs', type=int,  default=200, help='Number of epochs to train.')
 parser.add_argument("--label_rate", type=float, default=0.05, help='rate of labeled data')
 parser.add_argument('--ptb_rate', type=float, default=0.1, help="noise ptb_rate")
@@ -43,11 +47,9 @@ print(args)
 
 np.random.seed(15) 
 
-if args.dataset=='dblp':
-    from torch_geometric.datasets import CitationFull
-    import torch_geometric.utils as utils
-    dataset = CitationFull('./data','dblp')
-    adj = utils.to_scipy_sparse_matrix(dataset.data.edge_index)
+if args.dataset in ['Computers', 'Photo', 'CS' ,'dblp']:
+    dataset = load_torch_geometric_data('./data',args.dataset)
+    adj = torch_geometric.utils.to_scipy_sparse_matrix(dataset.data.edge_index)
     features = dataset.data.x.numpy()
     labels = dataset.data.y.numpy()
     idx = np.arange(len(labels))
@@ -81,6 +83,9 @@ train_labels = labels[idx_train]
 noise_y, P = noisify_with_P(train_labels,nclass, ptb, 10, args.noise)
 noise_labels = labels.copy()
 noise_labels[idx_train] = noise_y
+val_labels = labels[idx_val]
+noise_y, P = noisify_with_P(val_labels,nclass, ptb, 10, args.noise) 
+noise_labels[idx_val] = noise_y
 
 #noise_val_y,_ = noisify_with_P(labels[idx_val],nclass, ptb,args.seed)
 #noise_labels[idx_val] = noise_val_y

@@ -27,10 +27,10 @@ class S_model(GCN):
 
         super(S_model, self).__init__(nfeat, nhid, nclass, device=device)
         self.noise_ada = NoiseAda(nclass)
+        self.device = device
 
     def fit(self, features, adj, labels, idx_train, idx_val=None,train_iters=200, verbose=False):
 
-        self.device = self.gc1.weight.device
         self.initialize()
 
         self.edge_index, self.edge_weight = from_scipy_sparse_matrix(adj)
